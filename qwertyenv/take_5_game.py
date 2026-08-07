@@ -19,7 +19,7 @@ class Player:
     def __str__(self):
         return '\n'.join([
             'cards in hand: ' + ', '.join(map(Take5Game._format_card, self.cards)),
-            f'negative points: {self.negative_points:>3d}'
+            f'\tnegative points: {self.negative_points:>3d}'
         ])
 
 
@@ -43,6 +43,7 @@ class Take5Game:
             row.append(self._cards.pop(0))
 
     def step(self, cards: list[int]):
+        logger.info('selected cards: ' + ', '.join(map(Take5Game._format_card, cards)))
         assert len(cards) == len(self._players)
         for o in np.argsort(cards):
             player, card = self._players[o], cards[o]
@@ -56,9 +57,15 @@ class Take5Game:
                 if row_idx is None or self._board[row_idx][-1] > row[-1]:
                     row_idx = i
             if row_idx is None:
-                # no row fits, user selects a row and takes the cards there (leaving the new card)
-                # TODO: pick a row
-                row_idx = 0 # TODO:
+                # no row fits, user selects a row and takes the cards in that row (leaving the new card)
+                min_idx = None
+                min_val = None
+                for i, row in enumerate(self._board):
+                    val = reduce(lambda till_now, c: till_now + Take5Game._card_value(c), row)
+                    if min_idx is None or val < min_val:
+                        min_idx = i
+                        min_val = val
+                row_idx = min_idx
                 self._take_cards(player, row_idx)
             else:
                 if len(self._board[row_idx]) + 1 >= self._threshold:
@@ -82,12 +89,13 @@ class Take5Game:
         logger.info("\nPlayers:")
         for p, player in enumerate(self._players):
             logger.info(
-                f"{p})\t{player})\n"
+                f"{p})\t{player}\n"
             )
-        # if self._is_done():
-        #     winning_player = np.argmin(self._scores)
-        #     losing_player = np.argmax(self._scores)
-        #     logger.info(f"The game is over! {self._player_name(winning_player)} wins, {self._player_name(losing_player)} loses. Congratulations!")
+        if self.is_done():
+            scores = [player.negative_points for player in self._players]
+            winning_player = np.argmin(scores)
+            losing_player = np.argmax(scores)
+            logger.info(f"The game is over! {winning_player} wins, {losing_player} loses. Congratulations!")
         logger.info("-" * 120)
 
     @staticmethod
@@ -119,6 +127,7 @@ if __name__ == "__main__":
     take5.render()
 
     while not take5.is_done():
+        logger.info('')
         selected_cards = [p.cards[0] for p in take5._players]
         take5.step(selected_cards)
         take5.render()
