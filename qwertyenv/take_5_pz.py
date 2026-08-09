@@ -1,4 +1,5 @@
 from copy import copy
+import functools
 import random
 
 import numpy as np
@@ -68,9 +69,11 @@ class Take5Env(ParallelEnv):
     def render(self):
         self._game.render()
 
+    @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
         return Discrete(self._num_cards + 1)
 
+    @functools.lru_cache(maxsize=None)
     def observation_space(self, agent):
         return Tuple((MultiDiscrete((Take5Env.NUM_ROWS, Take5Env.NUM_COLS)), MultiDiscrete(10)))
 

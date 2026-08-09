@@ -59,7 +59,7 @@ class Take5Game:
                 assert len(row) > 0
                 if row[-1] > card:
                     continue
-                if row_idx is None or self._board[row_idx][-1] > row[-1]:
+                if row_idx is None or self._board[row_idx][-1] < row[-1]:
                     row_idx = i
             if row_idx is None:
                 # no row fits, user selects a row and takes the cards in that row (leaving the new card)
