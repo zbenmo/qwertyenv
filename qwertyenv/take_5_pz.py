@@ -110,7 +110,7 @@ if __name__ == "__main__":
 #     env = Take5Env(3)
 #     parallel_api_test(env, num_cycles=1_000_000)
 
-    env = Take5Env(3)
+    env = Take5Env(5)
     obs, info = env.reset()
     env.render()
     while True:

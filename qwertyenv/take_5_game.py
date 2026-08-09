@@ -2,6 +2,7 @@
 # Base this implementation on https://github.com/johannbrehmer/rl-6-nimmt
 
 from dataclasses import dataclass, field
+import operator
 import random
 import numpy as np
 from functools import reduce
@@ -66,7 +67,7 @@ class Take5Game:
                 min_idx = None
                 min_val = None
                 for i, row in enumerate(self._board):
-                    val = reduce(lambda till_now, c: till_now + Take5Game._card_value(c), row)
+                    val = reduce(operator.add, map(Take5Game._card_value, row))
                     if min_idx is None or val < min_val:
                         min_idx = i
                         min_val = val
@@ -81,7 +82,7 @@ class Take5Game:
         return len(self._players[0].cards) < 1
 
     def _take_cards(self, player, row_idx):
-        player.negative_points += reduce(lambda till_now, c: till_now + Take5Game._card_value(c), self._board[row_idx])
+        player.negative_points += reduce(operator.add, map(Take5Game._card_value, self._board[row_idx]))
         self._board[row_idx].clear()
 
     def render(self):
