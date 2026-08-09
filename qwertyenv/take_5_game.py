@@ -26,7 +26,12 @@ class Player:
 class Take5Game:
     """ Take5Game (6-Nimmt) """
 
-    def __init__(self, num_players, num_rows=4, num_cards=104, threshold=6):
+    def __init__(self, num_players: int, num_rows=4, num_cards=104, threshold=6):
+
+        assert num_players > 0
+        assert num_rows > 0
+        assert num_cards >= 10 * num_players + num_rows
+    
         self._players = [Player() for _ in range(num_players)]
         self._board = [[] for _ in range(num_rows)]
         self._threshold = threshold
