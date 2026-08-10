@@ -49,7 +49,7 @@ class Take5Game:
             row.append(self._cards.pop(0))
 
     def step(self, cards: list[int]):
-        logger.info('selected cards: ' + ', '.join(map(Take5Game._format_card, cards)))
+        # logger.info('selected cards: ' + ', '.join(map(Take5Game._format_card, cards)))
         assert len(cards) == len(self._players)
         for o in np.argsort(cards):
             player, card = self._players[o], cards[o]

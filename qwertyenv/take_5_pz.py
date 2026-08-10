@@ -33,7 +33,7 @@ class Take5Env(ParallelEnv):
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
-        self._game = Take5Game(self.num_agents)
+        self._game = Take5Game(len(self.possible_agents))
         self.agents = copy(self.possible_agents)
         obs, info = self._get_obs_and_info()
         return obs, info
@@ -105,19 +105,19 @@ class Take5Env(ParallelEnv):
 
 
 if __name__ == "__main__":
-#     from pettingzoo.test import parallel_api_test
+    from pettingzoo.test import parallel_api_test
 
-#     env = Take5Env(3)
-#     parallel_api_test(env, num_cycles=1_000_000)
+    env = Take5Env(3)
+    parallel_api_test(env, num_cycles=1_000_000)
 
-    env = Take5Env(5)
-    obs, info = env.reset()
-    env.render()
-    while True:
-        actions = {
-            a: o['action_mask'].index(1) for a, o in obs.items()
-        }
-        obs, reward, terminated, _, info = env.step(actions)
-        env.render()
-        if any(terminated.values()):
-            break
+    # env = Take5Env(5)
+    # obs, info = env.reset()
+    # env.render()
+    # while True:
+    #     actions = {
+    #         a: o['action_mask'].index(1) for a, o in obs.items()
+    #     }
+    #     obs, reward, terminated, _, info = env.step(actions)
+    #     env.render()
+    #     if any(terminated.values()):
+    #         break
