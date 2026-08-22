@@ -100,6 +100,10 @@ class Take5Env(ParallelEnv):
             a: {}
             for a in self.agents
         }
+        if self._game.is_done():
+            won = np.argmin([player.negative_points for player in self._game._players])
+            for k, v in info.items():
+                v['won'] = won
 
         return obs, info
 
