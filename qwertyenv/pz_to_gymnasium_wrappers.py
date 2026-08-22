@@ -114,8 +114,8 @@ def parallel_to_gymnasium(parallel_env: ParallelEnv, external_agent: str, act_ot
           options: Optional[dict] = None,
       ):
           super().reset(seed=seed)
-          self._observations = self._parallel_env.reset(seed=seed)
-          return self._observations[self._external_agent], {}
+          self._observations, self._infos = self._parallel_env.reset(seed=seed)
+          return self._observations[self._external_agent], self._infos[self._external_agent]
 
       def step(self, action):
           assert self._observations is not None
