@@ -15,6 +15,51 @@ class MCTSNode:
     children: dict[int, "MCTSNode"] = field(default_factory=dict)
 
 
+def possible_copy(env):
+    """Return a determinization of the wrapped Take 5 environment.
+
+    The board and the external player's hand are observable.  Deal every
+    other remaining card randomly while keeping each hidden hand and the
+    draw pile the same size as in the current game.
+    """
+    simulation_env = deepcopy(env)
+    parallel_env = simulation_env._parallel_env
+    game = parallel_env._game
+
+    if game is None:
+        raise RuntimeError("the environment must be reset before it can be copied")
+
+    external_player = int(simulation_env._external_agent)
+    known_cards = {
+        card
+        for row in game._board
+        for card in row
+    }
+    known_cards.update(game._players[external_player].cards)
+
+    unknown_cards = [
+        card
+        for card in range(1, parallel_env._num_cards + 1)
+        if card not in known_cards
+    ]
+    random.shuffle(unknown_cards)
+
+    offset = 0
+    for player_index, player in enumerate(game._players):
+        if player_index == external_player:
+            continue
+        hand_size = len(player.cards)
+        player.cards = sorted(unknown_cards[offset:offset + hand_size])
+        offset += hand_size
+
+    game._cards = unknown_cards[offset:]
+
+    simulation_env._observations, simulation_env._infos = (
+        parallel_env._get_obs_and_info()
+    )
+    return simulation_env
+
+
 class MCTSAgent:
     """A UCT agent for the single external player in the wrapped environment."""
 
@@ -38,7 +83,7 @@ class MCTSAgent:
 
         root = MCTSNode()
         for _ in range(self.simulations):
-            simulation_env = deepcopy(env)
+            simulation_env = possible_copy(env)
             simulation_observation = observation
             path = [root]
 
@@ -118,8 +163,12 @@ def random_valid_action(observation):
     return random.choice(actions)
 
 
-def main(eval_episodes=100, train_episodes=20):
-    agent = MCTSAgent()
+def main(eval_episodes=100):
+    agent = MCTSAgent() # already better than 1 / 3
+    # try also the following..
+    # MCTSAgent(simulations=64, rollout_depth=10)
+    # MCTSAgent(simulations=128, rollout_depth=15)
+    # MCTSAgent(simulations=256, rollout_depth=20)
     env = parallel_to_gymnasium(
         Take5Env(num_players=3),
         external_agent=0,
