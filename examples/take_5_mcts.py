@@ -209,5 +209,30 @@ def main(eval_episodes=100):
     evaluate()
 
 
+def main_play():
+    agent = MCTSAgent(simulations=128, rollout_depth=15)
+    env = parallel_to_gymnasium(
+        Take5Env(num_players=3),
+        external_agent=0,
+        act_others=lambda agent, obs: random_valid_action(obs),
+    )
+
+    obs, info = env.reset()
+    env.render()
+    while True:
+        action = agent.choose_action(env, obs)
+        user_action = int(input("what is your action ? "))
+        if action == user_action:
+            print("well done")
+        else:
+            print(f"our agent would have picked {action}")
+        obs, reward, terminated, _, info = env.step(user_action)
+        env.render()
+        if terminated:
+            break
+
+
+
 if __name__ == "__main__":
-    main()
+    # main()
+    main_play()
