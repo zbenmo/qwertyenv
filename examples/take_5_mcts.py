@@ -18,9 +18,9 @@ class MCTSNode:
 def possible_copy(env):
     """Return a determinization of the wrapped Take 5 environment.
 
-    The board and the external player's hand are observable.  Deal every
-    other remaining card randomly while keeping each hidden hand and the
-    draw pile the same size as in the current game.
+    The board, collected cards, and the external player's hand are observable.
+    Deal every other remaining card randomly while keeping each hidden hand
+    and the draw pile the same size as in the current game.
     """
     simulation_env = deepcopy(env)
     parallel_env = simulation_env._parallel_env
@@ -36,6 +36,11 @@ def possible_copy(env):
         for card in row
     }
     known_cards.update(game._players[external_player].cards)
+    known_cards.update(
+        card
+        for player in game._players
+        for card in player.cards_collected
+    )
 
     unknown_cards = [
         card
@@ -164,7 +169,7 @@ def random_valid_action(observation):
 
 
 def main(eval_episodes=100):
-    agent = MCTSAgent() # already better than 1 / 3
+    agent = MCTSAgent(simulations=128, rollout_depth=15) # MCTSAgent() # already better than 1 / 3
     # try also the following..
     # MCTSAgent(simulations=64, rollout_depth=10)
     # MCTSAgent(simulations=128, rollout_depth=15)

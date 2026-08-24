@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO)
 class Player:
     cards: list = field(default_factory=list)
     negative_points : int = 0
+    cards_collected: list = field(default_factory=list)
 
     def __str__(self):
         return '\n'.join([
@@ -83,6 +84,7 @@ class Take5Game:
 
     def _take_cards(self, player, row_idx):
         player.negative_points += reduce(operator.add, map(Take5Game._card_value, self._board[row_idx]))
+        player.cards_collected.extend(self._board[row_idx])
         self._board[row_idx].clear()
 
     def render(self):
