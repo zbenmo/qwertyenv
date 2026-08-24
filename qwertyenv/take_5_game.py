@@ -110,7 +110,7 @@ class Take5Game:
     def _card_value(card):
         """ Returns the points (Hornochsen) on a single card """
 
-        assert 1 <= card <= 104
+        assert 1 <= card <= 104, f'{card=}'
 
         if card == 55:
             return 7

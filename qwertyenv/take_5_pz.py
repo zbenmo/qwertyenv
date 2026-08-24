@@ -44,6 +44,8 @@ class Take5Env(ParallelEnv):
         ]
         self._game.step([actions[a] for a in self.agents])
         observations, infos = self._get_obs_and_info()
+        for info in infos.values():
+            info['actions'] = actions
         rewards = {
             a: before - after
             for a, before, after in zip(
@@ -77,7 +79,7 @@ class Take5Env(ParallelEnv):
     def observation_space(self, agent):
         return Tuple((MultiDiscrete((Take5Env.NUM_ROWS, Take5Env.NUM_COLS)), MultiDiscrete(10)))
 
-    def _get_obs_and_info(self):
+    def _get_obs_and_info(self) -> tuple[dict, dict]:
         board = self._game._board
         cols = self._game._threshold - 1
         board_obs = np.full((len(board), cols), -1, dtype=np.int32)

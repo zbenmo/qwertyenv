@@ -4,6 +4,7 @@ import math
 import random
 from tqdm import trange
 
+from qwertyenv.take_5_game import Take5Game
 from qwertyenv.take_5_pz import Take5Env
 from qwertyenv.pz_to_gymnasium_wrappers import parallel_to_gymnasium
 
@@ -72,6 +73,7 @@ class MCTSAgent:
         self.simulations = simulations
         self.rollout_depth = rollout_depth
         self.exploration = exploration
+        self._last_action_visits = {}
 
     @staticmethod
     def _actions(observation):
@@ -127,7 +129,33 @@ class MCTSAgent:
                 node.visits += 1
                 node.value += value
 
-        return max(actions, key=lambda action: root.children.get(action, MCTSNode()).visits)
+        self._last_action_visits = {
+            action: root.children.get(action, MCTSNode()).visits
+            for action in actions
+        }
+        return max(actions, key=lambda action: self._last_action_visits[action])
+
+    def action_goodness(self, action):
+        """Return a symbol describing the latest search support for an action."""
+        if action not in self._last_action_visits:
+            raise RuntimeError("choose_action must be called before action_goodness")
+
+        visits = self._last_action_visits
+        ranked_actions = sorted(visits, key=visits.get, reverse=True)
+        rank = ranked_actions.index(action)
+        if len(ranked_actions) == 1:
+            return "="
+
+        percentile = rank / (len(ranked_actions) - 1)
+        if percentile <= 0.2:
+            return "++"
+        if percentile <= 0.4:
+            return "+"
+        if percentile <= 0.6:
+            return "="
+        if percentile <= 0.8:
+            return "-"
+        return "--"
 
     def _uct(self, parent, child):
         if child.visits == 0:
@@ -209,6 +237,31 @@ def main(eval_episodes=100):
     evaluate()
 
 
+def _format_card(card):
+    return Take5Game._format_card(card)
+
+def render_obs(obs):
+    board, player_hand = obs['observation']
+
+    print("-" * 120)
+    print("Board:")
+    for _, cards in enumerate(board):
+        real_cards = [c for c in cards.tolist() if c > -1]
+        print(f"  " + " ".join([_format_card(card) for card in real_cards]) + "   _ " * (6 - len(real_cards) - 1) + "   * ")
+    print("\nHand(s):")
+    real_player_hand = [x for x in player_hand if x > -1]
+    print(' '.join(map(_format_card, real_player_hand)))
+    for _ in range(2):
+        print()
+        print(' '.join(map(lambda _: '?', real_player_hand)))
+    print()
+
+
+def render_action_goodness(obs, agent):
+    actions = [card for card in obs['observation'][1] if card > -1]
+    print("MCTS goodness:")
+    print(' '.join(f'{_format_card(card)} ({agent.action_goodness(card)})' for card in actions))
+
 def main_play():
     agent = MCTSAgent(simulations=128, rollout_depth=15)
     env = parallel_to_gymnasium(
@@ -218,17 +271,24 @@ def main_play():
     )
 
     obs, info = env.reset()
-    env.render()
+    render_obs(obs)
     while True:
         action = agent.choose_action(env, obs)
+        render_action_goodness(obs, agent)
         user_action = int(input("what is your action ? "))
-        if action == user_action:
-            print("well done")
-        else:
-            print(f"our agent would have picked {action}")
+        valid_inputs = set(obs['observation'][1])
+        valid_inputs.discard(-1)
+        while user_action not in valid_inputs:
+            print('Please try again')
+            user_action = int(input("what is your action ? "))
         obs, reward, terminated, _, info = env.step(user_action)
-        env.render()
+        print()
+        print(f"actions {info['actions']}")
+        print(f'reward: {reward}')
+        print()
+        render_obs(obs)
         if terminated:
+            env.render()
             break
 
 
