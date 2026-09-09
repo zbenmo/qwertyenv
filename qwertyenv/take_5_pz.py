@@ -85,7 +85,7 @@ class Take5Env(ParallelEnv):
 
     @functools.lru_cache(maxsize=None)
     def observation_space(self, agent):
-        return Tuple((MultiDiscrete((Take5Env.NUM_ROWS, Take5Env.NUM_COLS)), MultiDiscrete(10), MultiDiscrete(5)))
+        return Tuple((MultiDiscrete((Take5Env.NUM_ROWS, Take5Env.NUM_COLS)), MultiDiscrete(10), MultiDiscrete(5), Discrete(4)))
 
     def _get_obs_and_info(self) -> tuple[dict, dict]:
         board = self._game._board
@@ -97,8 +97,8 @@ class Take5Env(ParallelEnv):
 
         obs = {
             a: {
-                'observation': 
-                    (board_obs, np.full(10, -1, dtype=np.int32), np.full(5, -1, dtype=np.int32)), # Tuple: board, player's cards, played cards
+                'observation':
+                    (board_obs, np.full(10, -1, dtype=np.int32), np.full(5, -1, dtype=np.int32), state), # Tuple: board, player's cards, played cards, state
             }
             for a in self.agents
         }

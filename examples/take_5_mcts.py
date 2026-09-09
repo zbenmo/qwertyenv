@@ -2,9 +2,10 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 import math
 import random
+import numpy as np
 from tqdm import trange
 
-from qwertyenv.take_5_game import Take5Game
+from qwertyenv.take_5_game import GameState, Take5Game
 from qwertyenv.take_5_pz import Take5Env
 from qwertyenv.pz_to_gymnasium_wrappers import parallel_to_gymnasium
 
@@ -189,14 +190,17 @@ class MCTSAgent:
 
 
 def random_valid_action(observation):
-    actions = [
-        action
-        for action, allowed in enumerate(observation["action_mask"])
-        if allowed
-    ]
-    if len(actions) < 1:
-        return None
+    board, player_hand, played_cards, state = observation['observation']
+    if state == GameState.ROW_PICKING:
+        # I ignore the action_mask as I know I need to pick a row
+        row_sums = np.where(board == -1, 0, board).sum(axis=1)
+        return row_sums.argmin() 
     else:
+        actions = [
+            action
+            for action, allowed in enumerate(observation["action_mask"])
+            if allowed
+        ]
         return random.choice(actions)
 
 
@@ -229,7 +233,7 @@ def main(eval_episodes=100):
         print(f'{won}/{won + lost}')
 
 
-    obs, info = env.reset()
+    obs, info = env.reset(seed=1)
     env.render()
     while True:
         action = agent.choose_action(env, obs)
@@ -245,7 +249,7 @@ def _format_card(card):
     return Take5Game._format_card(card)
 
 def render_obs(obs):
-    board, player_hand, played_cards = obs['observation']
+    board, player_hand, played_cards, state = obs['observation']
 
     print("-" * 120)
     print("Board:")
@@ -262,9 +266,12 @@ def render_obs(obs):
 
 
 def render_action_goodness(obs, agent):
-    actions = [card for card in obs['observation'][1] if card > -1]
+    actions = agent._actions(obs)
     print("MCTS goodness:")
-    print(' '.join(f'{_format_card(card)} ({agent.action_goodness(card)})' for card in actions))
+    if obs['observation'][3] == GameState.ROW_PICKING:
+        print(' '.join(f'row {row} ({agent.action_goodness(row)})' for row in actions))
+    else:
+        print(' '.join(f'{_format_card(card)} ({agent.action_goodness(card)})' for card in actions))
 
 def main_play():
     agent = MCTSAgent(simulations=128, rollout_depth=15)
@@ -280,8 +287,7 @@ def main_play():
         action = agent.choose_action(env, obs)
         render_action_goodness(obs, agent)
         user_action = int(input("what is your action ? "))
-        valid_inputs = set(obs['observation'][1])
-        valid_inputs.discard(-1)
+        valid_inputs = set(agent._actions(obs))
         while user_action not in valid_inputs:
             print('Please try again')
             user_action = int(input("what is your action ? "))
