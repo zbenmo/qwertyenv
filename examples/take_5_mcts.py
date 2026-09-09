@@ -194,7 +194,7 @@ def random_valid_action(observation):
     if state == GameState.ROW_PICKING:
         # I ignore the action_mask as I know I need to pick a row
         row_sums = np.where(board == -1, 0, board).sum(axis=1)
-        return row_sums.argmin() 
+        return row_sums.argmin()
     else:
         actions = [
             action
@@ -293,7 +293,19 @@ def main_play():
             user_action = int(input("what is your action ? "))
         obs, reward, terminated, _, info = env.step(user_action)
         print()
-        print(f"actions {info['actions']}")
+        event = info['event']
+        if event['type'] == 'card_selection':
+            print(f"cards selected: {event['cards']}")
+            if event['pending_cards']:
+                print(
+                    f"pending cards waiting for row selection: "
+                    f"{event['pending_cards']}"
+                )
+        else:
+            print(
+                f"player {event['player']} selected row {event['row']} "
+                f"for pending cards {event['pending_cards']}"
+            )
         print(f'reward: {reward}')
         print()
         render_obs(obs)
@@ -304,5 +316,5 @@ def main_play():
 
 
 if __name__ == "__main__":
-    main()
-    #main_play()
+    #main()
+    main_play()

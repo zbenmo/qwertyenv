@@ -45,12 +45,26 @@ class Take5Env(ParallelEnv):
         if self._game._state == GameState.ROW_PICKING:
             assert len(self._game._picked_cards_by_player) > 0, f'{len(self._game._picked_cards_by_player)}'
             player_o = self._game._picked_cards_by_player[0]
+            pending_cards = self._game._picked_cards.copy()
+            event = {
+                'type': 'row_selection',
+                'player': player_o,
+                'row': actions[player_o],
+                'pending_cards': pending_cards,
+            }
             self._game.step_pick_row(actions[player_o]) # the picked row
         else:
+            event = {
+                'type': 'card_selection',
+                'cards': actions.copy(),
+            }
             self._game.step([actions[a] for a in self.agents])
+            event['pending_cards'] = self._game._picked_cards.copy()
+            event['state_after'] = self._game._state
         observations, infos = self._get_obs_and_info()
         for info in infos.values():
             info['actions'] = actions
+            info['event'] = event
         rewards = {
             a: before - after
             for a, before, after in zip(
