@@ -2,6 +2,7 @@
 # Base this implementation on https://github.com/johannbrehmer/rl-6-nimmt
 
 from dataclasses import dataclass, field
+from enum import Enum
 import operator
 import random
 import numpy as np
@@ -23,6 +24,12 @@ class Player:
             'cards in hand: ' + ', '.join(map(Take5Game._format_card, self.cards)),
             f'\tnegative points: {self.negative_points:>3d}'
         ])
+
+
+class GameState(Enum):
+    CARD_PICKING = 1
+    ROW_PICKING = 2
+    GAMES_END = 3
 
 
 class Take5Game:
@@ -49,12 +56,26 @@ class Take5Game:
         for row in self._board:
             row.append(self._cards.pop(0))
 
+        self._state = GameState.CARD_PICKING 
+        self._picked_cards = []
+        self._picked_cards_by_player = []
+
     def step(self, cards: list[int]):
+        assert self._state == GameState.CARD_PICKING, f"{self._state=}"
         # logger.info('selected cards: ' + ', '.join(map(Take5Game._format_card, cards)))
         assert len(cards) == len(self._players)
         for o in np.argsort(cards):
             player, card = self._players[o], cards[o]
             player.cards.remove(card) # card must be there
+            self._picked_cards.append(card)
+            self._picked_cards_by_player.append(o)
+        self._continue()
+
+    def _continue(self):
+        assert self._state == GameState.CARD_PICKING, f"{self._state=}"
+        while len(self._picked_cards) > 0:
+            player_o, card = self._picked_cards_by_player.pop(0), self._picked_cards.pop(0)
+            player = self._players[player_o]
             # now in which row the card goes?
             row_idx = None
             for i, row in enumerate(self._board):
@@ -65,19 +86,28 @@ class Take5Game:
                     row_idx = i
             if row_idx is None:
                 # no row fits, user selects a row and takes the cards in that row (leaving the new card)
-                min_idx = None
-                min_val = None
-                for i, row in enumerate(self._board):
-                    val = reduce(operator.add, map(Take5Game._card_value, row))
-                    if min_idx is None or val < min_val:
-                        min_idx = i
-                        min_val = val
-                row_idx = min_idx
-                self._take_cards(player, row_idx)
+                # put the card back
+                self._picked_cards_by_player.insert(0, player_o), self._picked_cards.insert(0, card)
+                self._state = GameState.ROW_PICKING
+                return
             else:
                 if len(self._board[row_idx]) + 1 >= self._threshold:
                     self._take_cards(player, row_idx)
             self._board[row_idx].append(card)
+        if self.is_done():
+            self._state = GameState.GAMES_END
+
+    def step_pick_row(self, row_idx: int):
+        assert self._state == GameState.ROW_PICKING, f"{self._state=}"
+        assert 0 <= row_idx < len(self._board), f'{row_idx=}'
+        assert len(self._picked_cards) > 0, f'{len(self._picked_cards)}'
+        assert len(self._picked_cards) == len(self._picked_cards_by_player), f'{len(self._picked_cards), len(self._picked_cards_by_player)}'
+        player_o, card = self._picked_cards_by_player.pop(0), self._picked_cards.pop(0)
+        player = self._players[player_o]
+        self._take_cards(player, row_idx)
+        self._board[row_idx].append(card)
+        self._state = GameState.CARD_PICKING
+        self._continue()
 
     def is_done(self) -> bool:
         return len(self._players[0].cards) < 1
@@ -139,3 +169,6 @@ if __name__ == "__main__":
         selected_cards = [p.cards[0] for p in take5._players]
         take5.step(selected_cards)
         take5.render()
+        while take5._state == GameState.ROW_PICKING:
+            take5.step_pick_row(0)
+            take5.render()

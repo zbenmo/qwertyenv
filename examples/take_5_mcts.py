@@ -86,6 +86,7 @@ class MCTSAgent:
     def choose_action(self, env, observation):
         actions = self._actions(observation)
         if len(actions) == 1:
+            self._last_action_visits = {actions[0]: 1}
             return actions[0]
 
         root = MCTSNode()
@@ -193,7 +194,10 @@ def random_valid_action(observation):
         for action, allowed in enumerate(observation["action_mask"])
         if allowed
     ]
-    return random.choice(actions)
+    if len(actions) < 1:
+        return None
+    else:
+        return random.choice(actions)
 
 
 def main(eval_episodes=100):
@@ -241,7 +245,7 @@ def _format_card(card):
     return Take5Game._format_card(card)
 
 def render_obs(obs):
-    board, player_hand = obs['observation']
+    board, player_hand, played_cards = obs['observation']
 
     print("-" * 120)
     print("Board:")
@@ -294,5 +298,5 @@ def main_play():
 
 
 if __name__ == "__main__":
-    # main()
-    main_play()
+    main()
+    #main_play()

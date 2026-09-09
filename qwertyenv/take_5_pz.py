@@ -5,7 +5,7 @@ import random
 import numpy as np
 # from typing import Optional
 
-from qwertyenv.take_5_game import Take5Game
+from qwertyenv.take_5_game import Take5Game, GameState
 from pettingzoo import ParallelEnv
 from gymnasium.spaces import Discrete, MultiDiscrete, Tuple
 
@@ -42,7 +42,12 @@ class Take5Env(ParallelEnv):
         negative_points_before = [
             player.negative_points for player in self._game._players
         ]
-        self._game.step([actions[a] for a in self.agents])
+        if self._game._state == GameState.ROW_PICKING:
+            assert len(self._game._picked_cards_by_player) > 0, f'{len(self._game._picked_cards_by_player)}'
+            player_o = self._game._picked_cards_by_player[0]
+            self._game.step_pick_row(actions[player_o]) # the picked row
+        else:
+            self._game.step([actions[a] for a in self.agents])
         observations, infos = self._get_obs_and_info()
         for info in infos.values():
             info['actions'] = actions
@@ -71,13 +76,16 @@ class Take5Env(ParallelEnv):
     def render(self):
         self._game.render()
 
+    def close(self):
+        self._game = None
+
     @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
         return Discrete(self._num_cards + 1)
 
     @functools.lru_cache(maxsize=None)
     def observation_space(self, agent):
-        return Tuple((MultiDiscrete((Take5Env.NUM_ROWS, Take5Env.NUM_COLS)), MultiDiscrete(10)))
+        return Tuple((MultiDiscrete((Take5Env.NUM_ROWS, Take5Env.NUM_COLS)), MultiDiscrete(10), MultiDiscrete(5)))
 
     def _get_obs_and_info(self) -> tuple[dict, dict]:
         board = self._game._board
@@ -85,18 +93,33 @@ class Take5Env(ParallelEnv):
         board_obs = np.full((len(board), cols), -1, dtype=np.int32)
         for i, row in enumerate(board):
             board_obs[i, :len(row)] = row
+        state = self._game._state
 
         obs = {
             a: {
                 'observation': 
-                    (board_obs, np.full(10, -1, dtype=np.int32)), # Tuple: board, players cards
+                    (board_obs, np.full(10, -1, dtype=np.int32), np.full(5, -1, dtype=np.int32)), # Tuple: board, player's cards, played cards
             }
             for a in self.agents
         }
-        for a, player in zip(self.agents, self._game._players):
-            cards = player.cards
-            obs[a]['observation'][1][:len(cards)] = cards
-            obs[a]['action_mask'] = [1 if i in player.cards else 0 for i in range(104 + 1)]
+        if state == GameState.ROW_PICKING:
+            player_to_pick_o = self._game._picked_cards_by_player[0]
+            player_to_pick = self._game._players[player_to_pick_o]
+            num_rows = len(self._game._board)
+            picked_cards = self._game._picked_cards
+            for a, player in zip(self.agents, self._game._players):
+                cards = player.cards
+                obs[a]['observation'][1][:len(cards)] = cards
+                obs[a]['observation'][2][:len(picked_cards)] = picked_cards
+                obs[a]['action_mask'] = [
+                    0 if player != player_to_pick else # wait for your turn
+                    0 if i >= num_rows else 1 for i in range(104 + 1) # pick a row
+                ]
+        else:
+            for a, player in zip(self.agents, self._game._players):
+                cards = player.cards
+                obs[a]['observation'][1][:len(cards)] = cards
+                obs[a]['action_mask'] = [1 if i in player.cards else 0 for i in range(104 + 1)]
 
         info = {
             a: {}

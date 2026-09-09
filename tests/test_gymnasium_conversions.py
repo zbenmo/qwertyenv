@@ -8,6 +8,7 @@ from qwertyenv import (
     aec_to_gymnasium,
     parallel_to_gymnasium,
 )
+from qwertyenv.take_5_pz import Take5Env
 
 
 @pytest.mark.parametrize(
@@ -77,4 +78,25 @@ def test_pistonball(me):
 
         if terminated or truncated:
             observation, info = gym_env.reset()
+    gym_env.close()
+
+
+def test_take_5_wrapper_advances_opponent_row_picks():
+    parallel_env = Take5Env(num_players=3)
+    gym_env = parallel_to_gymnasium(
+        parallel_env=parallel_env,
+        external_agent=0,
+        act_others=lambda agent, observation: np.flatnonzero(
+            observation["action_mask"]
+        )[0],
+    )
+
+    observation, _ = gym_env.reset(seed=42)
+    for _ in range(100):
+        assert np.any(observation["action_mask"])
+        action = np.flatnonzero(observation["action_mask"])[0]
+        observation, _, terminated, truncated, _ = gym_env.step(action)
+        if terminated or truncated:
+            break
+
     gym_env.close()

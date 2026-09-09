@@ -115,32 +115,52 @@ def parallel_to_gymnasium(parallel_env: ParallelEnv, external_agent: str, act_ot
       ):
           super().reset(seed=seed)
           self._observations, self._infos = self._parallel_env.reset(seed=seed)
-          return self._observations[self._external_agent], self._infos[self._external_agent]
+          self._last_observation = self._observations[self._external_agent]
+          return self._last_observation, self._infos[self._external_agent]
 
       def step(self, action):
           assert self._observations is not None
-          actions = {
-              agent: (
-                  action
-                  if agent == self._external_agent
-                  else self._act_others(agent, self._observations[agent])
-              )
-              for agent in self._parallel_env.agents
-          }
-          (
-              observations,
-              rewards,
-              terminations,
-              truncations,
-              infos,
-          ) = self._parallel_env.step(actions)
+          observations = self._observations
+          while True:
+              actions = {
+                  agent: (
+                      action
+                      if agent == self._external_agent
+                      else self._act_others(agent, observations[agent])
+                  )
+                  for agent in self._parallel_env.agents
+              }
+              (
+                  observations,
+                  rewards,
+                  terminations,
+                  truncations,
+                  infos,
+              ) = self._parallel_env.step(actions)
+
+              if self._external_agent not in observations:
+                  terminated = True
+                  truncated = False
+                  break
+
+              observation = observations[self._external_agent]
+              terminated = terminations[self._external_agent]
+              truncated = truncations[self._external_agent]
+              if terminated or truncated or any(observation["action_mask"]):
+                  break
+
+              # The external player is waiting while another player picks a row.
+              # The next loop iteration advances that hidden decision.
+
           self._observations = observations
+          if self._external_agent in observations:
+              self._last_observation = observations[self._external_agent]
           return (
-              self._observations[self._external_agent],
-              rewards[self._external_agent],
-              terminations[self._external_agent],
-              truncations[self._external_agent],
-              infos[self._external_agent],
+              self._last_observation,
+              rewards.get(self._external_agent, 0),
+              terminated,
+              truncated,
+              infos.get(self._external_agent, {}),
           )
 
       def render(self, *args, **kwargs):
