@@ -355,7 +355,7 @@ class RayBased(Piece, ABC):
         for ray in self._rays:
             for target_square_str in ray:
                 piece_there_str = game.board[target_square_str]
-                if piece_there_str not in [EMPTY, COIN, DIAMOND] and self.same_color(piece_there_str):
+                if piece_there_str not in [EMPTY, COIN, DIAMOND]:
                     break # this ray reached a piece of its own color
                 ret = self.attempt_move(game, target_square_str, is_checked)
                 if not ret:
