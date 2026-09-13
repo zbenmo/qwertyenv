@@ -35,6 +35,7 @@ class CollectCointsGameState:
     board: Dict[Position, PieceStr]
     turn: str
     castling_rights: set[bool]
+    move_number: int
 
     @staticmethod
     def from_fen(fen: str = default_fen) -> 'CollectCointsGameState':
@@ -62,6 +63,7 @@ class CollectCointsGameState:
             board=board,
             turn=turn,
             castling_rights=set(),
+            move_number=0
         )
 
     def to_fen(self) -> str:
@@ -105,6 +107,14 @@ class CollectCointsGameState:
         print()
         print(f'turn={self.turn}')
         print()
+
+    def all_pieces(self, player: str) -> Generator[Tuple[PieceStr, Position], None, None]:
+        for_black: bool = player == 'b'
+        for position, piece_str in self.board.items():
+            if piece_str in [EMPTY, COIN, DIAMOND]:
+                continue
+            if piece_str.isupper() != for_black: # xor
+                yield piece_str, position
 
 
 @dataclass(repr=False)
@@ -157,6 +167,7 @@ class Piece(ABC):
         pass
 
     def same_color(self, other_piece_str: PieceStr) -> bool:
+        assert other_piece_str not in [EMPTY, COIN, DIAMOND], f'{other_piece_str}'
         return self._piece_str.isupper() == other_piece_str.isupper()
 
     def attempt_move(self,
@@ -341,7 +352,7 @@ class RayBased(Piece, ABC):
         for ray in self._rays:
             for target_square_str in ray:
                 piece_there_str = game.board[target_square_str]
-                if piece_there_str != EMPTY and self.same_color(piece_there_str):
+                if piece_there_str not in [EMPTY, COIN, DIAMOND] and self.same_color(piece_there_str):
                     break # this ray reached a piece of its own color
                 ret = self.attempt_move(game, target_square_str, is_checked)
                 if not ret:
@@ -584,6 +595,11 @@ class CollectCointsGame:
         # return False
         return False
 
+    def possible_moves(self) -> Generator[Tuple[Move, 'CollectCointsGame'],None,None]:
+        for piece_str, position in self._state.all_pieces(player=self._state.turn):
+            piece = CollectCointsGame._piece_for(piece_str, position)
+            yield from piece.possible_moves(self._state, CollectCointsGame.is_checked)
+
     def __init__(self):
         self._state = CollectCointsGameState.from_fen()
         self._scores = Counter()
@@ -608,7 +624,7 @@ class CollectCointsGame:
         assert False, f'move {move} is not valid'
 
     def is_done(self) -> bool:
-        return all(x not in [COIN, DIAMOND] for x in self._state.board.items()), 
+        return all(x not in [COIN, DIAMOND] for x in self._state.board.values()) 
 
     def display(self):
         self._state.display()
@@ -628,11 +644,20 @@ def main_game():
 
     game.display()
 
-    print('-' * 80)
+    count_half_moves = 0
+    while not game.is_done() and count_half_moves < 100:
+        print('-' * 80)
+        move, _ = next(iter(game.possible_moves()))
+        print()
+        print(f'move: {move}')
+        print()
+        game.step(move)
+        game.display()
+        count_half_moves += 1
 
-    game.step('h1g1')
+    # game.step('h1g1')
 
-    game.display()
+    # game.display()
 
 
 if __name__ == "__main__":
