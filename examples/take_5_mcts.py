@@ -316,5 +316,5 @@ def main_play():
 
 
 if __name__ == "__main__":
-    #main()
-    main_play()
+    main()
+    #main_play()

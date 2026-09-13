@@ -149,8 +149,8 @@ def parallel_to_gymnasium(parallel_env: ParallelEnv, external_agent: str, act_ot
               if terminated or truncated or any(observation["action_mask"]):
                   break
 
-              # The external player is waiting while another player picks a row.
-              # The next loop iteration advances that hidden decision.
+              # The external player is waiting while another player is playing.
+              # The next loop iteration advancing the game.
 
           self._observations = observations
           if self._external_agent in observations:
