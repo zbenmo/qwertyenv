@@ -1,6 +1,7 @@
 from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
+import random
 from typing import Callable, Dict, Generator, List, Set, Tuple
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -36,6 +37,7 @@ class CollectCointsGameState:
     turn: str
     castling_rights: set[bool]
     move_number: int
+    en_passant: str
 
     @staticmethod
     def from_fen(fen: str = default_fen) -> 'CollectCointsGameState':
@@ -63,7 +65,8 @@ class CollectCointsGameState:
             board=board,
             turn=turn,
             castling_rights=set(),
-            move_number=0
+            move_number=0,
+            en_passant='-',
         )
 
     def to_fen(self) -> str:
@@ -647,7 +650,7 @@ def main_game():
     count_half_moves = 0
     while not game.is_done() and count_half_moves < 100:
         print('-' * 80)
-        move, _ = next(iter(game.possible_moves()))
+        move, _ = random.choice(list(game.possible_moves()))
         print()
         print(f'move: {move}')
         print()
