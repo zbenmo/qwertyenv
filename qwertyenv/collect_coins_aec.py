@@ -122,8 +122,15 @@ class CollectCoinsAEC(AECEnv):
             return
         board = self._game._state.board
         print()
+        files = " ".join("abcdefgh")
+        print(f"  {files}")
         for row in reversed("12345678"):
-            print("".join("." if board[f"{col}{row}"] == EMPTY else board[f"{col}{row}"] for col in "abcdefgh"))
+            squares = " ".join(
+                "." if board[f"{col}{row}"] == EMPTY else board[f"{col}{row}"]
+                for col in "abcdefgh"
+            )
+            print(f"{row} {squares} {row}")
+        print(f"  {files}")
         print(f"turn={self.agent_selection}")
         print(f"scores={dict(self._game._scores)}")
 
