@@ -41,6 +41,10 @@ GAME_OPTIONS = (
         "Knight vs knight: coin islands and diamonds",
         "n7/$$$5/8/3*4/3$$3/8/5$$$/7N w",
     ),
+    (
+        "Two bishops vs two bishops: coins and diamond",
+        "1b4b1/$$$$$$$$/$$$$$$$$/$$$$$$$$/$$$*$$$$/$$$$$$$$/$$$$$$$$/1B4B1 w",
+    ),
 )
 
 
@@ -150,8 +154,9 @@ class MCTSAgent:
 
 
 def action_label(env, action):
-    source = env._piece_position(env.agent_selection)[1]
-    target = env._positions[action]
+    source_index, target_index = divmod(action, 64)
+    source = env._positions[source_index]
+    target = env._positions[target_index]
     return f"{action}: {source}-{target}"
 
 
@@ -159,13 +164,13 @@ def choose_human_action(env):
     actions = MCTSAgent._actions(env)
     print("Legal moves: " + ", ".join(action_label(env, action) for action in actions))
     while True:
-        answer = input("Choose a move (number or square, e.g. d4): ").strip().lower()
+        answer = input("Choose a move (number or move, e.g. b1-d3): ").strip().lower()
         try:
             action = int(answer)
         except ValueError:
             matches = [
                 action for action in actions
-                if env._positions[action].lower() == answer
+                if action_label(env, action).split(": ", 1)[1] == answer
             ]
             action = matches[0] if len(matches) == 1 else -1
         if action in actions:
@@ -179,14 +184,14 @@ def choose_game_option():
         print(f"  {number}. {description}")
 
     while True:
-        answer = input("Select 1-8: ").strip()
+        answer = input(f"Select 1-{len(GAME_OPTIONS)}: ").strip()
         try:
             option = int(answer)
         except ValueError:
             option = 0
         if 1 <= option <= len(GAME_OPTIONS):
             return GAME_OPTIONS[option - 1]
-        print("Please select a number from 1 to 8.")
+        print(f"Please select a number from 1 to {len(GAME_OPTIONS)}.")
 
 
 def main_play(

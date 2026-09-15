@@ -39,13 +39,13 @@ class CollectCoinsAEC(AECEnv):
 
     @lru_cache(maxsize=None)
     def action_space(self, agent):
-        return Discrete(64)
+        return Discrete(4096)
 
     @lru_cache(maxsize=None)
     def observation_space(self, agent):
         return Dict({
             "board": MultiDiscrete(np.full((8, 8), 5, dtype=np.int64)),
-            "action_mask": MultiBinary(64),
+            "action_mask": MultiBinary(4096),
         })
 
     def reset(self, seed=None, options=None):
@@ -56,7 +56,7 @@ class CollectCoinsAEC(AECEnv):
         self._game = CollectCointsGame(fen)
         if fen is None:
             self._game._state.board["d4"] = DIAMOND
-        self._assert_single_piece_per_agent()
+        self._assert_piece_per_agent()
         self.agents = copy(self.possible_agents)
         self.terminations = {agent: False for agent in self.agents}
         self.truncations = {agent: False for agent in self.agents}
@@ -70,25 +70,29 @@ class CollectCoinsAEC(AECEnv):
 
     def observe(self, agent):
         board = self._game._state.board
-        own_position = self._piece_position(agent)[1]
-        other_position = self._piece_position(self._next_agent(agent))[1]
+        own_positions = {position for _, position in self._piece_positions(agent)}
+        other_positions = {
+            position for _, position in self._piece_positions(self._next_agent(agent))
+        }
         encoded_board = np.array(
             [
-                3 if position == own_position else
-                4 if position == other_position else
+                3 if position in own_positions else
+                4 if position in other_positions else
                 self._piece_values[board[position]]
                 for position in self._positions
             ],
             dtype=np.int64,
         ).reshape(8, 8)
-        mask = np.zeros(64, dtype=np.int8)
+        mask = np.zeros(4096, dtype=np.int8)
         if (
             agent == self.agent_selection
             and not self.terminations[agent]
             and not self.truncations[agent]
         ):
-            for position in self._legal_targets(agent):
-                mask[self._position_to_action[position]] = 1
+            for source, target in self._legal_moves(agent):
+                source_index = self._position_to_action[source]
+                target_index = self._position_to_action[target]
+                mask[source_index * 64 + target_index] = 1
         return {"board": encoded_board, "action_mask": mask}
 
     def step(self, action):
@@ -97,23 +101,23 @@ class CollectCoinsAEC(AECEnv):
             return
 
         agent = self.agent_selection
-        legal_targets = self._legal_targets(agent)
         if not self.action_space(agent).contains(action):
-            raise ValueError(f"Action must be an integer from 0 through 63, got {action!r}")
-        target = self._positions[action]
-        if target not in legal_targets:
-            raise ValueError(f"Action {action} does not select a legal target square")
+            raise ValueError(f"Action must be an integer from 0 through 4095, got {action!r}")
+        source_index, target_index = divmod(int(action), 64)
+        source = self._positions[source_index]
+        target = self._positions[target_index]
+        if (source, target) not in self._legal_moves(agent):
+            raise ValueError(f"Action {action} does not select a legal move")
 
         score_before = self._game._scores["w" if agent == "white" else "b"]
-        piece_position = self._piece_position(agent)[1]
-        self._game.step(f"{piece_position}{target}")
+        self._game.step(f"{source}{target}")
         score_after = self._game._scores["w" if agent == "white" else "b"]
 
         self._clear_rewards()
         self.rewards[agent] = score_after - score_before
         self._cumulative_rewards[agent] = 0
 
-        done = self._game.is_done() or not self._legal_targets(self._next_agent(agent))
+        done = self._game.is_done() or not self._legal_moves(self._next_agent(agent))
         self.terminations = {current_agent: done for current_agent in self.agents}
         if done:
             self._accumulate_rewards()
@@ -143,7 +147,7 @@ class CollectCoinsAEC(AECEnv):
         print(f"turn={self.agent_selection}")
         print(f"scores={dict(self._game._scores)}")
 
-    def _piece_position(self, agent):
+    def _piece_positions(self, agent):
         is_white = agent == "white"
         pieces = [
             (piece, position)
@@ -151,27 +155,29 @@ class CollectCoinsAEC(AECEnv):
             if piece not in [EMPTY, COIN, DIAMOND]
             and piece.isupper() == is_white
         ]
-        assert len(pieces) == 1, (
-            f"expected exactly one piece for {agent}, found {len(pieces)}"
+        assert pieces, (
+            f"expected at least one piece for {agent}, found none"
         )
-        return pieces[0]
+        return pieces
 
-    def _assert_single_piece_per_agent(self):
-        self._piece_position("white")
-        self._piece_position("black")
+    def _assert_piece_per_agent(self):
+        self._piece_positions("white")
+        self._piece_positions("black")
 
     def _next_agent(self, agent):
         return "black" if agent == "white" else "white"
 
-    def _legal_targets(self, agent):
-        piece_str, piece_position = self._piece_position(agent)
-        piece = self._game._piece_for(piece_str, piece_position)
-        return [
-            move[2:4]
-            for move, _ in piece.possible_moves(
-                self._game._state, CollectCointsGame.is_checked
+    def _legal_moves(self, agent):
+        legal_moves = []
+        for piece_str, piece_position in self._piece_positions(agent):
+            piece = self._game._piece_for(piece_str, piece_position)
+            legal_moves.extend(
+                (move[:2], move[2:4])
+                for move, _ in piece.possible_moves(
+                    self._game._state, CollectCointsGame.is_checked
+                )
             )
-        ]
+        return legal_moves
 
 
 def test():
