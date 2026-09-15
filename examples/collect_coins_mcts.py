@@ -8,6 +8,42 @@ import numpy as np
 from qwertyenv.collect_coins_aec import CollectCoinsAEC
 
 
+GAME_OPTIONS = (
+    (
+        "Rook vs rook: coins",
+        "r$6/$$$$$$$$/$$$$$$$$/$$$$$$$$/$$$$$$$$/$$$$$$$$/$$$$$$$$/7R w",
+    ),
+    (
+        "Rook vs rook: coins and diamond",
+        "r$6/$$$$$$$$/$$$$$$$$/$$$*$$$$/$$$$$$$$/$$$$$$$$/$$$$$$$$/7R w",
+    ),
+    (
+        "Knight vs knight: coins",
+        "n$6/$$$$$$$$/$$$$$$$$/$$$$$$$$/$$$$$$$$/$$$$$$$$/$$$$$$$$/7N w",
+    ),
+    (
+        "Knight vs knight: coins and diamond",
+        "n$6/$$$$$$$$/$$$$$$$$/$$$*$$$$/$$$$$$$$/$$$$$$$$/$$$$$$$$/7N w",
+    ),
+    (
+        "Rook vs knight: coins",
+        "r$6/$$$$$$$$/$$$$$$$$/$$$$$$$$/$$$$$$$$/$$$$$$$$/$$$$$$$$/7N w",
+    ),
+    (
+        "Rook vs knight: coins and diamonds",
+        "r$6/$$$$$$$$/$$$*$$$$/$$$$$$$$/$$$$$$$$/$$$$$$$$/$$$$$$$$/7N w",
+    ),
+    (
+        "Rook vs rook: coin islands",
+        "r7/$$$5/8/8/3$$3/8/5$$$/7R w",
+    ),
+    (
+        "Knight vs knight: coin islands and diamonds",
+        "n7/$$$5/8/3*4/3$$3/8/5$$$/7N w",
+    ),
+)
+
+
 @dataclass
 class MCTSNode:
     visits: int = 0
@@ -114,7 +150,7 @@ class MCTSAgent:
 
 
 def action_label(env, action):
-    source = env._rook_position(env.agent_selection)
+    source = env._piece_position(env.agent_selection)[1]
     target = env._positions[action]
     return f"{action}: {source}-{target}"
 
@@ -137,10 +173,35 @@ def choose_human_action(env):
         print("Please choose one of the listed legal moves.")
 
 
-def main_play(human_player="white", seed=None, simulations=256, rollout_depth=32):
+def choose_game_option():
+    print("Choose a game:")
+    for number, (description, _) in enumerate(GAME_OPTIONS, start=1):
+        print(f"  {number}. {description}")
+
+    while True:
+        answer = input("Select 1-8: ").strip()
+        try:
+            option = int(answer)
+        except ValueError:
+            option = 0
+        if 1 <= option <= len(GAME_OPTIONS):
+            return GAME_OPTIONS[option - 1]
+        print("Please select a number from 1 to 8.")
+
+
+def main_play(
+    human_player="white",
+    seed=None,
+    simulations=256,
+    rollout_depth=32,
+    fen=None,
+):
+    if fen is None:
+        description, fen = choose_game_option()
+        print(f"Starting: {description}")
     planner_player = "black" if human_player == "white" else "white"
     planner = MCTSAgent(planner_player, simulations, rollout_depth)
-    env = CollectCoinsAEC()
+    env = CollectCoinsAEC(fen=fen)
     env.reset(seed=seed)
 
     try:

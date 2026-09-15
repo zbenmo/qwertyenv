@@ -12,7 +12,6 @@ from qwertyenv.collect_coins_game import (
     COIN,
     DIAMOND,
     EMPTY,
-    RookRays,
     W_R,
     CollectCointsGame,
 )
@@ -25,8 +24,9 @@ class CollectCoinsAEC(AECEnv):
     _position_to_action = {position: action for action, position in enumerate(_positions)}
     _piece_values = {EMPTY: 0, COIN: 1, DIAMOND: 2, W_R: 3, B_R: 4}
 
-    def __init__(self):
+    def __init__(self, fen=None):
         super().__init__()
+        self._fen = fen
         self.possible_agents = ["white", "black"]
         self.agents = []
         self._game = None
@@ -52,32 +52,41 @@ class CollectCoinsAEC(AECEnv):
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
-        self._game = CollectCointsGame()
-        self._game._state.board["d4"] = DIAMOND
+        fen = options.get("fen", self._fen) if options else self._fen
+        self._game = CollectCointsGame(fen)
+        if fen is None:
+            self._game._state.board["d4"] = DIAMOND
+        self._assert_single_piece_per_agent()
         self.agents = copy(self.possible_agents)
         self.terminations = {agent: False for agent in self.agents}
         self.truncations = {agent: False for agent in self.agents}
         self.rewards = {agent: 0 for agent in self.agents}
         self.infos = {agent: {} for agent in self.agents}
         self._cumulative_rewards = {agent: 0 for agent in self.agents}
-        self._agent_selector = agent_selector.agent_selector(self.agents)
+        first_agent = "white" if self._game._state.turn == "w" else "black"
+        agent_order = [first_agent, self._next_agent(first_agent)]
+        self._agent_selector = agent_selector.agent_selector(agent_order)
         self.agent_selection = self._agent_selector.reset()
 
     def observe(self, agent):
         board = self._game._state.board
-        own_piece = W_R if agent == "white" else B_R
-        other_piece = B_R if agent == "white" else W_R
+        own_position = self._piece_position(agent)[1]
+        other_position = self._piece_position(self._next_agent(agent))[1]
         encoded_board = np.array(
             [
-                3 if board[position] == own_piece else
-                4 if board[position] == other_piece else
+                3 if position == own_position else
+                4 if position == other_position else
                 self._piece_values[board[position]]
                 for position in self._positions
             ],
             dtype=np.int64,
         ).reshape(8, 8)
         mask = np.zeros(64, dtype=np.int8)
-        if not self.terminations[agent] and not self.truncations[agent]:
+        if (
+            agent == self.agent_selection
+            and not self.terminations[agent]
+            and not self.truncations[agent]
+        ):
             for position in self._legal_targets(agent):
                 mask[self._position_to_action[position]] = 1
         return {"board": encoded_board, "action_mask": mask}
@@ -96,8 +105,8 @@ class CollectCoinsAEC(AECEnv):
             raise ValueError(f"Action {action} does not select a legal target square")
 
         score_before = self._game._scores["w" if agent == "white" else "b"]
-        rook_position = self._rook_position(agent)
-        self._game.step(f"{rook_position}{target}")
+        piece_position = self._piece_position(agent)[1]
+        self._game.step(f"{piece_position}{target}")
         score_after = self._game._scores["w" if agent == "white" else "b"]
 
         self._clear_rewards()
@@ -134,29 +143,35 @@ class CollectCoinsAEC(AECEnv):
         print(f"turn={self.agent_selection}")
         print(f"scores={dict(self._game._scores)}")
 
-    def _rook_position(self, agent):
-        piece = W_R if agent == "white" else B_R
-        return next(position for position, value in self._game._state.board.items() if value == piece)
+    def _piece_position(self, agent):
+        is_white = agent == "white"
+        pieces = [
+            (piece, position)
+            for position, piece in self._game._state.board.items()
+            if piece not in [EMPTY, COIN, DIAMOND]
+            and piece.isupper() == is_white
+        ]
+        assert len(pieces) == 1, (
+            f"expected exactly one piece for {agent}, found {len(pieces)}"
+        )
+        return pieces[0]
+
+    def _assert_single_piece_per_agent(self):
+        self._piece_position("white")
+        self._piece_position("black")
 
     def _next_agent(self, agent):
         return "black" if agent == "white" else "white"
 
     def _legal_targets(self, agent):
-        rook_position = self._rook_position(agent)
-        rook = self._game._piece_for(
-            W_R if agent == "white" else B_R, rook_position
-        )
-        board = self._game._state.board
-        targets = []
-        for ray in rook._rays:
-            for position in ray:
-                value = board[position]
-                if value not in [EMPTY, COIN, DIAMOND]:
-                    break
-                targets.append(position)
-                if value in [COIN, DIAMOND]:
-                    break
-        return targets
+        piece_str, piece_position = self._piece_position(agent)
+        piece = self._game._piece_for(piece_str, piece_position)
+        return [
+            move[2:4]
+            for move, _ in piece.possible_moves(
+                self._game._state, CollectCointsGame.is_checked
+            )
+        ]
 
 
 def test():

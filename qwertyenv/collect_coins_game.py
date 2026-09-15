@@ -38,6 +38,7 @@ class CollectCointsGameState:
     castling_rights: set[bool]
     move_number: int
     en_passant: str
+    half_moves: int = 0
 
     @staticmethod
     def from_fen(fen: str = default_fen) -> 'CollectCointsGameState':
@@ -67,6 +68,7 @@ class CollectCointsGameState:
             castling_rights=set(),
             move_number=0,
             en_passant='-',
+            half_moves=0,
         )
 
     def to_fen(self) -> str:
@@ -314,7 +316,7 @@ class Knight(Piece):
     def possible_moves(self, game: CollectCointsGameState, is_checked: IsChecked) -> Generator[Tuple[Move, CollectCointsGameState],None,None]:
         for move_square_str in self._theoretical_moves:
             piece_there_str = game.board[move_square_str]
-            if piece_there_str != EMPTY and self.same_color(piece_there_str):
+            if piece_there_str not in [EMPTY, COIN, DIAMOND]:
                 continue
             ret = self.attempt_move(game, move_square_str, is_checked)
             if not ret:
@@ -603,8 +605,8 @@ class CollectCointsGame:
             piece = CollectCointsGame._piece_for(piece_str, position)
             yield from piece.possible_moves(self._state, CollectCointsGame.is_checked)
 
-    def __init__(self):
-        self._state = CollectCointsGameState.from_fen()
+    def __init__(self, fen=None):
+        self._state = CollectCointsGameState.from_fen() if fen is None else CollectCointsGameState.from_fen(fen)
         self._scores = Counter()
 
     def step(self, move: str):
